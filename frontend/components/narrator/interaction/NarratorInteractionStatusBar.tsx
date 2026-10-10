@@ -45,6 +45,7 @@ import { ModelPriceModal } from "../model/ModelPriceModal";
 import { modelInheritanceLabel } from "../model/model-inheritance-label";
 import { MODEL_MENU_POSITIONING } from "../model/model-menu-selection";
 import { PERM_MODE_ICONS, PERM_MODES } from "../narrator-panel-types";
+import { NarratorStatusline } from "../statusline/NarratorStatusline";
 import type { RetryInfo } from "../useNarratorPanelWS";
 import { InlineOverrideActions } from "./InlineOverrideActions";
 import { PermissionMenuContent } from "./PermissionMenuContent";
@@ -476,6 +477,10 @@ export function NarratorInteractionStatusBar(props: NarratorInteractionStatusBar
 									startedAtLabel={workIndicator.turnStartedAtLabel}
 									isMobile={isMobileViewport}
 								/>
+							)}
+							{/* LOCAL PATCH: status line, see ~/.narrafork-deploy/LOCAL_PATCHES.md */}
+							{!isWorkspacePreview && !isMobileViewport && (
+								<NarratorStatusline narratorId={narratorId} />
 							)}
 						</Group>
 					)}
