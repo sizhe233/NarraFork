@@ -478,11 +478,11 @@ export function NarratorInteractionStatusBar(props: NarratorInteractionStatusBar
 									isMobile={isMobileViewport}
 								/>
 							)}
-							{/* LOCAL PATCH: status line, see ~/.narrafork-deploy/LOCAL_PATCHES.md */}
-							{!isWorkspacePreview && !isMobileViewport && (
-								<NarratorStatusline narratorId={narratorId} />
-							)}
 						</Group>
+					)}
+					{/* LOCAL PATCH: usage, outside the idle/working ternary so it survives a turn. See ~/.narrafork-deploy/LOCAL_PATCHES.md */}
+					{!isWorkspacePreview && !isMobileViewport && (
+						<NarratorStatusline narratorId={narratorId} />
 					)}
 				</Group>
 				{workIndicator.show && !isWorkspacePreview && workIndicator.turnElapsedText && (

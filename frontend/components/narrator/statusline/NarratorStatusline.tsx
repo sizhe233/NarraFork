@@ -1,23 +1,28 @@
 /**
  * LOCAL PATCH (not upstream) — see ~/.narrafork-deploy/LOCAL_PATCHES.md.
  *
- * Shows this narrator's accumulated spend, including its direct subagents, in the idle
- * part of the status bar: `· 用量 $72.60`.
+ * Shows this narrator's accumulated spend, including its direct subagents, in the left
+ * part of the status bar: `· 用量 $72.60`. Rendered outside the idle/working switch so it
+ * stays visible (and keeps updating) while a turn runs.
  *
  * Source: `GET /narrators/:id/usage-stats?includeSubagents=true`, the same endpoint the
  * details panel uses. It sums `api_requests.cost_usd` (the per-request cost records) on an
  * indexed query that runs in the DB read worker, so it is safe to call per idle transition.
  * `narrators.total_cost_usd` is NOT used: upstream only ever adds 0 to it, so it stays 0.
  *
- * Refresh policy: one fetch on mount, then one each time the narrator stops working. No
- * polling — the line is only rendered while idle, and spend only changes during a turn.
+ * Refresh policy: one fetch on mount, one when a turn ends, and during a turn at most one
+ * per 10s triggered by finished assistant messages. No timer polling.
  */
 import { Text, Tooltip } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNarrator, useNarratorUsageStats } from "../../../hooks/useNarrator";
+import { narratorWSManager } from "../../../lib/narrator-ws-manager";
 import { formatCostUsd } from "./statusline-format";
+
+/** At most one usage query per this interval while assistant messages stream in. */
+const REFRESH_MIN_INTERVAL_MS = 10_000;
 
 const LABELS = {
 	en: {
@@ -57,6 +62,32 @@ export function NarratorStatusline({ narratorId }: { narratorId: string }) {
 			});
 		}
 	}, [qc, narratorId, status]);
+
+	// While a turn runs, each finished assistant message means at least one billed request
+	// landed. Refresh on those, throttled, so the number moves during long turns without
+	// re-querying on every streamed chunk.
+	useEffect(() => {
+		let last = 0;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		const refresh = () => {
+			timer = null;
+			last = Date.now();
+			void qc.invalidateQueries({ queryKey: ["narrators", narratorId, "usage-stats"] });
+		};
+		const handle = narratorWSManager.addListener(
+			{ narratorIds: [narratorId], types: ["message"] },
+			(event) => {
+				const role = (event.message as { role?: string } | undefined)?.role;
+				if (role !== "assistant" || timer) return;
+				const wait = Math.max(0, last + REFRESH_MIN_INTERVAL_MS - Date.now());
+				timer = setTimeout(refresh, wait);
+			},
+		);
+		return () => {
+			narratorWSManager.removeListener(handle);
+			if (timer) clearTimeout(timer);
+		};
+	}, [qc, narratorId]);
 
 	const cost = formatCostUsd(stats?.totalCost);
 	if (!stats || !cost) return null;
