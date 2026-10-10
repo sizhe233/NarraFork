@@ -37,6 +37,9 @@ import {
 	metadataValue,
 } from "./model-catalog-form";
 
+/** The editor modal sits at Z.modal + 1, so portalled option lists must stack above it. */
+const CATALOG_COMBOBOX_PROPS = { withinPortal: true, zIndex: Z.modal + 2 } as const;
+
 export interface CatalogEditorTarget {
 	kind: "model" | "variant" | "binding";
 	id: string;
@@ -117,6 +120,7 @@ export function CatalogMetadataFields({
 											{options ? (
 												<Select
 													aria-label={label}
+													comboboxProps={CATALOG_COMBOBOX_PROPS}
 													data={options.map((v) => ({ value: v, label: t(`catalog.values.${v}`) }))}
 													value={value || null}
 													disabled={readOnly || (!!edit && edit.mode !== "set")}
@@ -346,6 +350,7 @@ export function ModelCatalogEditor({
 						{target.kind !== "model" && (
 							<Select
 								label={t("catalog.model")}
+								comboboxProps={CATALOG_COMBOBOX_PROPS}
 								searchable
 								clearable
 								data={models.map((m) => ({ value: m.id, label: m.name ?? m.id }))}
@@ -360,6 +365,7 @@ export function ModelCatalogEditor({
 						{target.kind === "binding" && (
 							<Select
 								label={t("catalog.variant")}
+								comboboxProps={CATALOG_COMBOBOX_PROPS}
 								searchable
 								clearable
 								data={variants
