@@ -37,9 +37,7 @@ describe("upstream contracts the patch relies on", () => {
 		expect(read("server/routes/narrators.ts")).toContain(
 			'const includeSubagents = c.req.query("includeSubagents") !== "false";',
 		);
-		expect(read("server/services/usage-history-service.ts")).toContain(
-			"filters.includeSubagents",
-		);
+		expect(read("server/services/usage-history-service.ts")).toContain("filters.includeSubagents");
 		expect(read("frontend/hooks/useNarrator.ts")).toContain(
 			'queryKey: ["narrators", narratorId, "usage-stats", { includeSubagents }]',
 		);
