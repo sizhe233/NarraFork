@@ -30,6 +30,17 @@ describe("isReasoningMandatoryError", () => {
 		expect(isReasoningMandatoryError(new ApiError(400, MANDATORY_MESSAGE))).toBe(true);
 	});
 
+	test("matches a Claude model that only accepts adaptive thinking", () => {
+		expect(
+			isReasoningMandatoryError(
+				new ApiError(
+					400,
+					"Anthropic API error 400: claude-opus-5-5 requires adaptive thinking; omit thinking or use thinking.type=adaptive and output_config.effort",
+				),
+			),
+		).toBe(true);
+	});
+
 	test("matches the phrase through diagnostics text", () => {
 		expect(
 			isReasoningMandatoryError({
