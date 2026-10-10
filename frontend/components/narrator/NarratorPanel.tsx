@@ -223,7 +223,6 @@ import { resolveSelectionOverlayBlockId } from "./scroll/selection-anchor-overla
 import { type SwipeAnchorInfo, setGlobalOnSwipeAnchorInfo } from "./scroll/swipeState";
 import { useMessageSelection } from "./selection/use-message-selection";
 import { revealSpecFile } from "./spec/spec-file-reveal";
-import { useStatuslineContextPublisher } from "./statusline/statusline-store";
 import {
 	AllowRetryCtx,
 	LatestTodosToolUseIdCtx,
@@ -1330,13 +1329,6 @@ function NarratorPanelBody({
 		setUnreadCount,
 		viewers,
 	} = wsState;
-	// LOCAL PATCH: feed the status line, see ~/.narrafork-deploy/LOCAL_PATCHES.md
-	useStatuslineContextPublisher(narratorId, {
-		percent: contextPercent,
-		promptTokens,
-		contextWindow,
-		stale: contextStale,
-	});
 	setUnreadCountRef.current = setUnreadCount;
 	// Quota display + NUG recharge derivations (flags, dialog disclosure, and the
 	// payment-required reconstruction / auto-open effects) live in useNarratorQuota.
