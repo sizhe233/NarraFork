@@ -864,7 +864,9 @@ export function isModelUnavailableError(err: unknown): boolean {
  * Phrases an endpoint uses to say "you may not turn reasoning off".
  *
  * Observed: `Anthropic API error 400: Reasoning is mandatory for this endpoint
- * and cannot be disabled.` Some gateways only serve reasoning-enabled traffic,
+ * and cannot be disabled.`, and from Claude models that only accept adaptive
+ * thinking: `claude-opus-5-5 requires adaptive thinking; omit thinking or use
+ * thinking.type=adaptive and output_config.effort`. Some gateways only serve reasoning-enabled traffic,
  * so an explicit `thinking: {type:"disabled"}` / `reasoning_effort: "none"` is a
  * hard 400 there — including on auxiliary calls (titles, summaries) which
  * deliberately ask for no reasoning to stay cheap.
@@ -886,6 +888,7 @@ const REASONING_MANDATORY_PATTERNS = [
 	"cannot disable thinking",
 	"reasoning is required for this",
 	"thinking is required for this",
+	"requires adaptive thinking",
 ];
 
 /** Collect human-readable provider text from an error graph (bounded depth). */
