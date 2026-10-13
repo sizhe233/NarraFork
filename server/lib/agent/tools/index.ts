@@ -26,6 +26,7 @@ import { knowledgeReviewTool } from "./knowledge-review";
 import { learningGuideTool } from "./learning-guide";
 import { mcpAdminTool } from "./mcp-admin";
 import { narraforkAdminTool } from "./narrafork-admin";
+import { narratorControlTool } from "./narrator-control";
 import { notificationTool } from "./notification";
 import { packActivateTool, packDeactivateTool, packListTool } from "./pack";
 import { extractPipelineTool, startPipelineTool } from "./pipeline";
@@ -71,6 +72,8 @@ export const OPTIONAL_TOOLS: ReadonlyMap<string, ToolDefinition> = new Map([
 	["Recall", recallTool],
 	["Browser", browserTool],
 	["ForkNarrator", forkNarratorTool],
+	// LOCAL PATCH narrator-control (see ~/.narrafork-deploy/LOCAL_PATCHES.md): steer the user's other primary narrators.
+	["NarratorControl", narratorControlTool],
 	["ScheduledTask", scheduledTaskTool],
 	["NarraForkAdmin", narraforkAdminTool],
 	["PackList", packListTool],
