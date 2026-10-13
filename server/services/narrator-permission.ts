@@ -1302,6 +1302,8 @@ function isReadOnlyCall(toolName: string, input: Record<string, unknown>): boole
 	if (READ_ONLY_TOOLS.includes(toolName)) return true;
 	if (toolName === "Notification") return input.action === "list_channels";
 	if (toolName === "GenUI") return isGenUiReadAction(input.action);
+	// LOCAL PATCH narrator-control (see ~/.narrafork-deploy/LOCAL_PATCHES.md): listing is metadata-only; send/interrupt drive another session.
+	if (toolName === "NarratorControl") return input.action === "list";
 	if (toolName === "Worktree") return input.action === "list";
 	return toolName === "StructSed" && input.dry_run !== false;
 }

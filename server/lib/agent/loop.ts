@@ -667,6 +667,8 @@ const EAGER_EXECUTION_DISABLED_TOOLS = new Set([
 	"HookAdmin",
 	"ScheduledTaskAdmin",
 	"ForkNarrator",
+	// LOCAL PATCH narrator-control (see ~/.narrafork-deploy/LOCAL_PATCHES.md): drives another session; never mid-stream.
+	"NarratorControl",
 	"EnterPlanMode",
 	...DANGER_REFLECTION_TOOLS,
 	...EXIT_PLAN_REFLECTION_TOOLS,

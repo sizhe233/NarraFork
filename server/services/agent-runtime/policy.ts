@@ -159,6 +159,8 @@ export function isRuntimeToolAllowed(
 	if (toolName === "AskUserQuestion" && caps.askUserQuestion === "disabled") return false;
 	if (["Agent", "Task", "ContinueTask", "ForkNarrator"].includes(toolName) && !caps.spawnAgent)
 		return false;
+	// LOCAL PATCH narrator-control (see ~/.narrafork-deploy/LOCAL_PATCHES.md): steering independent sessions is a primary-only capability.
+	if (toolName === "NarratorControl" && policy.variant !== "primary") return false;
 	if (["EnterPlanMode", "ExitPlanMode"].includes(toolName) && !caps.planApproval) return false;
 	if (toolName.startsWith("mcp__")) {
 		if (policy.tools.mcp === "none" || mcpBehavior === "deny") return false;

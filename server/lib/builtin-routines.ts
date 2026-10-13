@@ -144,6 +144,18 @@ export const BUILTIN_ROUTINES: BuiltinRoutine[] = [
 			descriptionZh: "将当前会话分叉为独立叙述者（不新建工作区）",
 		},
 	},
+	// LOCAL PATCH narrator-control (see ~/.narrafork-deploy/LOCAL_PATCHES.md)
+	{
+		id: "narrator_control",
+		type: "tool",
+		category: "tools",
+		tool: {
+			toolName: "NarratorControl",
+			descriptionEn:
+				"Control your other narrators — list, send messages (queued / immediate / urgent guidance) and interrupt",
+			descriptionZh: "控制你的其他叙述者 — 列出、发送消息（排队 / 即时引导 / 紧急引导）、中断",
+		},
+	},
 	{
 		id: "scheduled_task",
 		type: "tool",
