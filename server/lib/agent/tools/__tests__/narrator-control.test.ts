@@ -30,22 +30,12 @@ describe("NarratorControl upstream hook points (source guard)", () => {
 	const root = `${import.meta.dir}/../../../../..`;
 	const read = (path: string) => readFileSync(`${root}/${path}`, "utf8");
 
-	test("eager execution, read-only classification and origin pass-through stay wired", () => {
+	test("eager execution and read-only classification stay wired", () => {
 		expect(read("server/lib/agent/loop.ts")).toMatch(
 			/EAGER_EXECUTION_DISABLED_TOOLS = new Set\(\[[\s\S]*?"NarratorControl"/,
 		);
 		expect(read("server/services/narrator-permission.ts")).toContain(
 			'if (toolName === "NarratorControl") return input.action === "list";',
-		);
-		expect(read("server/services/narrator-session-state.ts")).toMatch(
-			/interface BufferedExecutionIntent \{[\s\S]*?origin\?:/,
-		);
-		// Both persistence paths for consumed user input must forward the queued origin.
-		expect(read("server/services/narrator-session.ts")).toContain(
-			"origin: origin ?? accepted.executionIntent?.origin,",
-		);
-		expect(read("server/services/agent-runtime/orchestrator.ts")).toContain(
-			"origin: buffered.executionIntent?.origin,",
 		);
 	});
 });

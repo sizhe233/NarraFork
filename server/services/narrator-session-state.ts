@@ -335,12 +335,6 @@ export interface BufferedExecutionIntent {
 	modelOverride?: { model: string; mode: "temporary" | "permanent" };
 	/** Built-in control command; execute only after the previous owner has finalized. */
 	controlCommand?: boolean;
-	/**
-	 * LOCAL PATCH narrator-control (see ~/.narrafork-deploy/LOCAL_PATCHES.md): attribution for input an agent queued on another
-	 * narrator's behalf. Display-only; travels with the accepted row so a message
-	 * consumed after queuing is not re-attributed to the human who triggered it.
-	 */
-	origin?: import("@shared/message-origin").MessageOriginOptions;
 }
 
 export interface BufferedMessage {
