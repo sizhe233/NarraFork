@@ -2997,7 +2997,6 @@ export async function runAgentLoopUnlocked(
 						composerDocument: buffered.composerDocument,
 						commandText: buffered.commandText,
 						createdBy: buffered.createdBy,
-						origin: buffered.executionIntent?.origin, // LOCAL PATCH narrator-control
 					});
 					pendingBufferedDelivery = undefined;
 					await cleanupBufferedTextFilesAsync(buffered._stagingId ?? buffered.id);

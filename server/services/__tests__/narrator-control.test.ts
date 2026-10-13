@@ -4,8 +4,8 @@
  * Pinned properties:
  * - only the triggering user's OWN primary narrators are reachable (admin does not widen it);
  * - subagents and the caller itself are refused;
- * - send uses the composer admission with the requested queue mode, a sender prefix and an
- *   agent origin carried in executionIntent (so a queued message keeps its attribution);
+ * - send uses the composer admission with the requested queue mode and a sender prefix
+ *   (attribution is text-only; no origin is threaded through the queue);
  * - interrupt-with-message is one urgent-guidance admission, not abort-then-send;
  * - ping-pong between two narrators is rate limited.
  */
@@ -146,7 +146,7 @@ describe("send", () => {
 		});
 	}
 
-	test("defaults to turn, prefixes the sender and carries an agent origin", async () => {
+	test("defaults to turn and prefixes the sender", async () => {
 		const sent = await control.sendControlMessage(caller, { target: "Worker", message: "hi" });
 		expect(sent).toMatchObject({ targetId: "worker", mode: "turn", buffered: false });
 		const call = acceptCalls[0];
@@ -154,9 +154,8 @@ describe("send", () => {
 		expect(call?.prompt).toStartWith('[来自叙述者"Supervisor"（caller）的消息');
 		expect(call?.prompt).toEndWith("\nhi");
 		expect(call?.options.userId).toBe("alice");
-		expect(call?.options.executionIntent).toEqual({
-			origin: { origin: "assistant", originLabel: "agentMessage:Supervisor" },
-		});
+		expect(call?.prompt).toContain("不是用户本人输入");
+		expect(call?.options.executionIntent).toBeUndefined();
 	});
 
 	test("reports queued delivery while the target is busy", async () => {

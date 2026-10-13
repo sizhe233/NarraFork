@@ -16,9 +16,11 @@
  * or admin-visible narrator belonging to someone else is reported exactly like a
  * missing one, so ids cannot be probed.
  *
- * Messages are prefixed with the sender's identity (the model must know a machine
- * wrote them) and stored with `origin: "assistant"` / `agentMessage:<sender>` so the
- * reader is not told a human typed them.
+ * Attribution is carried ONLY by a text prefix on the message body ("from narrator X,
+ * sent by an AI, not typed by the user"). The stored row keeps the composer's default
+ * origin on purpose: threading a separate origin through the queue would add hook
+ * points in upstream persistence code, and the prefix already tells both the model and
+ * the reader who wrote it.
  */
 
 import type { BufferQueueMode } from "@shared/buffer-queue-mode";
@@ -28,7 +30,6 @@ import { narrators } from "../db/schema";
 import { getUserLanguage, getUserReplyInLanguage } from "../lib/i18n";
 import { logger } from "../lib/logger";
 import { isSubagentVariant } from "../lib/narrator-utils";
-import { buildAgentMessageOrigin } from "./agent-message-origin";
 
 export type NarratorControlMode = BufferQueueMode;
 
@@ -278,7 +279,6 @@ export async function sendControlMessage(
 
 	const sender = await senderIdentity(caller);
 	const prompt = formatControlMessage(sender, mode, body, caller.locale);
-	const origin = buildAgentMessageOrigin({ ...sender, isParent: false });
 	const wasBusy = isNarratorRuntimeBusy(target.id) || session.isLoopRunning(target.id);
 	const [locale, replyInUserLanguage] = await Promise.all([
 		getUserLanguage(userId),
@@ -293,7 +293,6 @@ export async function sendControlMessage(
 		// A compacting narrator must not start a turn against history being replaced;
 		// the compact exit drains the queue on every outcome.
 		queueOnly: isCompactInProgress(target.id),
-		executionIntent: { origin },
 	});
 	recordSend(caller.narratorId, target.id);
 	logger.info("NarratorControl message delivered", {
