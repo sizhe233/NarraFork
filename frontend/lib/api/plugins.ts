@@ -137,6 +137,8 @@ export interface PluginPermanentDenial {
 
 export interface PluginRuntimeDiagnostics {
 	runtimeId?: string;
+	/** Process state (`active`, `stopped`, …); localised via `admin.runtime.<state>`. */
+	state?: string;
 	generation?: number;
 	inFlight?: number;
 	lateMessages?: number;

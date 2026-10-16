@@ -255,6 +255,83 @@ describe("plugin routes", () => {
 		expect(body.diagnostics).toEqual([{ code: "PROCESS_EXIT", message: "plugin failed" }]);
 	});
 
+	it("projects the manager's diagnostics envelope onto the plugin's runtime view", async () => {
+		const manager = new MockPluginManager();
+		// The real PluginManager.getDiagnostics(pluginId) shape: an envelope whose plugin
+		// status carries the runtime block. Passed straight through sanitizeSummary, the
+		// runtime was dropped and the diagnostics tab was always empty.
+		manager.diagnosticsResult = {
+			featureEnabled: true,
+			persistence: [{ code: "STATE_OK", message: "ok", path: "/private/state.json" }],
+			catalog: [],
+			plugins: [
+				{
+					pluginId: "com.example.other",
+					runtime: { runtimeId: "rt_other", stderr: "other plugin" },
+				},
+				{
+					pluginId: "com.example.demo",
+					desiredState: "enabled",
+					runtimeState: "active",
+					diagnostics: [{ code: "PROCESS_EXIT", message: "plugin failed", raw: "do-not-return" }],
+					runtime: {
+						pluginId: "com.example.demo",
+						runtimeId: "rt_7",
+						generation: 3,
+						state: "active",
+						pid: 4242,
+						inFlight: 1,
+						lateMessages: 0,
+						capabilities: ["provider.use"],
+						startedAt: "2026-10-16T13:57:42.000Z",
+						stderr: `warn token=super-secret\n${"y".repeat(1_500)}`,
+						lastError: {
+							code: "IDLE_TIMEOUT",
+							message: "Plugin runtime idle timeout",
+							phase: "idle",
+						},
+					},
+				},
+			],
+		};
+		const app = createApp(manager);
+		const response = await app.request("/com.example.demo/diagnostics");
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			pluginId: string;
+			runtime: Record<string, unknown>;
+			lastError: Record<string, unknown>;
+			diagnostics: Array<Record<string, unknown>>;
+		};
+		expect(body.pluginId).toBe("com.example.demo");
+		expect(body.runtime).toMatchObject({
+			runtimeId: "rt_7",
+			generation: 3,
+			state: "active",
+			inFlight: 1,
+			lateMessages: 0,
+			startedAt: "2026-10-16T13:57:42.000Z",
+		});
+		expect(String(body.runtime.stderrSummary).length).toBeLessThanOrEqual(1_000);
+		expect(body.lastError).toEqual({
+			code: "IDLE_TIMEOUT",
+			message: "Plugin runtime idle timeout",
+			phase: "idle",
+		});
+		expect(body.diagnostics).toEqual([{ code: "PROCESS_EXIT", message: "plugin failed" }]);
+		const json = JSON.stringify(body);
+		for (const hidden of [
+			"super-secret",
+			"4242",
+			"provider.use",
+			"rt_other",
+			"/private/state.json",
+			"do-not-return",
+		]) {
+			expect(json).not.toContain(hidden);
+		}
+	});
+
 	it("exposes an admin-only bounded grant API and stamps the authenticated admin actor", async () => {
 		const manager = new MockPluginManager();
 		const app = createApp(manager, true, allowNamedAdmin);

@@ -212,6 +212,7 @@
 				"empty": "暂无诊断信息。",
 				"lastError": "最近错误",
 				"runtime": "运行时",
+				"state": "进程状态",
 				"runtimeId": "运行时 ID",
 				"generation": "代际",
 				"inFlight": "进行中的请求",

@@ -212,6 +212,7 @@
 				"empty": "No diagnostics reported.",
 				"lastError": "Last error",
 				"runtime": "Runtime",
+				"state": "Process state",
 				"runtimeId": "Runtime ID",
 				"generation": "Generation",
 				"inFlight": "In-flight requests",
