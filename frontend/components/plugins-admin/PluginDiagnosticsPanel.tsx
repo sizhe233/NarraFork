@@ -80,6 +80,16 @@ export function PluginDiagnosticsPanel({
 					</Text>
 					<Paper withBorder p="sm" radius="sm">
 						<Stack gap={4}>
+							{runtime.state && (
+								<Group justify="space-between" wrap="nowrap">
+									<Text size="sm" c="dimmed">
+										{t("admin.detail.diagnostics.state")}
+									</Text>
+									<Text size="sm">
+										{t(`admin.runtime.${runtime.state}`, { defaultValue: runtime.state })}
+									</Text>
+								</Group>
+							)}
 							{runtime.runtimeId && (
 								<Group justify="space-between" wrap="nowrap">
 									<Text size="sm" c="dimmed">

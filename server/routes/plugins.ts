@@ -274,6 +274,48 @@ function sanitizeText(value: unknown, max = MAX_DIAGNOSTIC_TEXT): string | undef
 		.slice(-max);
 }
 
+/**
+ * Project the manager's diagnostics envelope onto the per-plugin shape the detail page
+ * reads (`runtime`, `diagnostics`, `lastError` at the top level).
+ *
+ * `PluginManager.getDiagnostics(pluginId)` returns `{ featureEnabled, persistence, catalog,
+ * plugins: [status] }`. Run through `sanitizeSummary` as-is, only `plugins` survived and the
+ * runtime block was dropped entirely, so the diagnostics tab was empty for every plugin.
+ * A flat status (older managers, tests) still goes through `sanitizeSummary` unchanged.
+ */
+function sanitizePluginDiagnostics(value: unknown, pluginId: string): RouteResult {
+	if (!isRecord(value) || !Array.isArray(value.plugins)) return sanitizeSummary(value);
+	const status = value.plugins.find(
+		(entry): entry is Record<string, unknown> => isRecord(entry) && entry.pluginId === pluginId,
+	);
+	if (!status) return sanitizeSummary({ pluginId, diagnostics: [] });
+	const result = sanitizeSummary(status) as Record<string, unknown>;
+	const runtime = sanitizeRuntimeDiagnostics(status.runtime);
+	if (runtime) result.runtime = runtime;
+	if (!result.lastError && isRecord(status.runtime) && isRecord(status.runtime.lastError)) {
+		result.lastError = sanitizeDiagnostic(status.runtime.lastError);
+	}
+	return result;
+}
+
+/** Bounded, redacted view of one plugin process (no pid, env, capabilities or raw stderr). */
+function sanitizeRuntimeDiagnostics(value: unknown): Record<string, unknown> | undefined {
+	if (!isRecord(value)) return undefined;
+	const result: Record<string, unknown> = {};
+	if (typeof value.runtimeId === "string") result.runtimeId = value.runtimeId.slice(0, 128);
+	if (typeof value.state === "string") result.state = value.state.slice(0, 32);
+	for (const key of ["generation", "inFlight", "lateMessages"] as const) {
+		const number = value[key];
+		if (typeof number === "number" && Number.isFinite(number)) result[key] = number;
+	}
+	for (const key of ["startedAt", "stoppedAt"] as const) {
+		if (typeof value[key] === "string") result[key] = (value[key] as string).slice(0, 64);
+	}
+	const stderr = sanitizeText(value.stderr);
+	if (stderr) result.stderrSummary = stderr;
+	return result;
+}
+
 function sanitizeDiagnostic(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
 		return { code: "UNKNOWN", message: "Unknown plugin diagnostic" };
@@ -699,7 +741,7 @@ export function createPluginRoutes(
 				? manager.getDiagnostics(pluginId)
 				: manager.getStatus(pluginId));
 			if (result == null) throw new NotFoundError("Plugin", pluginId);
-			return c.json(sanitizeSummary(result));
+			return c.json(sanitizePluginDiagnostics(result, pluginId));
 		} catch (error) {
 			return errorResponse(c, error);
 		}
