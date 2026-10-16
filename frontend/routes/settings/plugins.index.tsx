@@ -38,7 +38,7 @@ import {
 	usePlugins,
 	useUninstallPlugin,
 } from "../../hooks/usePlugins";
-import type { PluginSummary } from "../../lib/api/plugins";
+import { type PluginSummary, pluginSummaryVersion } from "../../lib/api/plugins";
 
 export const Route = createFileRoute("/settings/plugins/")({
 	component: SettingsPluginsPage,
@@ -239,7 +239,7 @@ function SettingsPluginsPage() {
 											<PluginStatusBadge plugin={plugin} />
 										</Table.Td>
 										<Table.Td>
-											<Text size="sm">{plugin.version ?? "—"}</Text>
+											<Text size="sm">{pluginSummaryVersion(plugin) ?? "—"}</Text>
 										</Table.Td>
 										<Table.Td>
 											{diagnosticCount > 0 ? (

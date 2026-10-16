@@ -155,6 +155,8 @@ export interface PluginSummary {
 	description?: string;
 	version?: string;
 	hash?: string;
+	/** The installed package. Lifecycle summaries report the version only here. */
+	current?: PluginPackageRef | null;
 	status?: string;
 	desiredState?: PluginDesiredState;
 	runtimeState?: PluginRuntimeState;
@@ -167,6 +169,19 @@ export interface PluginSummary {
 	restartCount?: number;
 	consecutiveFailures?: number;
 	lastError?: PluginDiagnostic;
+}
+
+/**
+ * Version to show for a plugin summary.
+ *
+ * Lifecycle summaries (the list endpoint) carry the installed version only as
+ * `current.version`; catalog entries carry a top-level `version`. Reading just one of
+ * them left the list's version column empty for every installed plugin.
+ */
+export function pluginSummaryVersion(
+	plugin: Pick<PluginSummary, "version" | "current">,
+): string | undefined {
+	return plugin.current?.version ?? plugin.version;
 }
 
 export interface PluginListResponse {
