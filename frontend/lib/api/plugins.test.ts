@@ -217,3 +217,13 @@ describe("plugins API", () => {
 		expect(calls).toEqual(["/api/plugins/ui/contributions", "/api/plugins/ui/health"]);
 	});
 });
+
+describe("pluginSummaryVersion", () => {
+	test("reads the installed version from current, as lifecycle summaries report it", async () => {
+		const { pluginSummaryVersion } = await import("./plugins");
+		expect(pluginSummaryVersion({ current: { version: "0.1.2", hash: "a" } })).toBe("0.1.2");
+		expect(pluginSummaryVersion({ version: "1.0.0" })).toBe("1.0.0");
+		expect(pluginSummaryVersion({ version: "1.0.0", current: { version: "2.0.0" } })).toBe("2.0.0");
+		expect(pluginSummaryVersion({})).toBeUndefined();
+	});
+});

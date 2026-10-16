@@ -28,7 +28,11 @@ import {
 	syncPluginUiContributions,
 } from "../plugins";
 
-/** Height of the embedded view. Fixed so the iframe has a stable box to lay out in. */
+/**
+ * Initial height of the embedded view. A view that reports its content height through
+ * `panel.setHeight` is resized to fit (clamped host-side); one that never reports keeps
+ * this box.
+ */
 const SURFACE_HEIGHT = 520;
 
 export interface PluginSettingsSurfacePanelProps {
@@ -115,6 +119,14 @@ function PluginSettingsSurfaceFrame({
 	contributionId: string;
 }) {
 	const [title, setTitle] = useState<string | undefined>();
+	/**
+	 * Content height reported by the plugin through `panel.setHeight`.
+	 *
+	 * The iframe is sandboxed without `allow-same-origin`, so the host cannot measure the
+	 * document itself; the plugin observes its own content and reports. Same contract as
+	 * the provider-settings surface (`PluginProviderSection`).
+	 */
+	const [height, setHeight] = useState(SURFACE_HEIGHT);
 
 	// One stable instance id per mounted view. It must not change across re-renders or
 	// the runtime would tear the session down and rebuild it on every update.
@@ -147,13 +159,15 @@ function PluginSettingsSurfaceFrame({
 			updateParameters: () => {},
 			setActive: () => {},
 			close: () => {},
+			// The state setter is stable, so a height report never re-registers the delegate.
+			setHeight,
 		}),
 		[title],
 	);
 
 	return (
 		<PluginUiSurfaceProvider hostContext={{ surface: "settings" }}>
-			<Paper withBorder radius="md" style={{ height: SURFACE_HEIGHT, overflow: "hidden" }}>
+			<Paper withBorder radius="md" style={{ height, overflow: "hidden" }}>
 				<PluginDockPanelView rawParams={params} hostApi={hostApi} />
 			</Paper>
 		</PluginUiSurfaceProvider>
