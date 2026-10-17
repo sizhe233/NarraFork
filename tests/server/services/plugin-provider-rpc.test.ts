@@ -578,6 +578,64 @@ describe("credit, cancellation, and late events", () => {
 		expect(transport.killed).toHaveLength(0);
 	});
 
+	it("releases the operation slot when the consumer stops after error before reading done", async () => {
+		// local(provider-budget-release) guard: an adapter that throws on the error event closes the
+		// iterator with error + done(failed) still queued. That must free the slot, or failures
+		// leak maxInFlightOperations until every call fails with PLUGIN_BUSY.
+		const { client, transport } = await setup({ limits: { maxInFlightOperations: 2 } });
+		clients.push(client);
+		for (let attempt = 0; attempt < 3; attempt += 1) {
+			const operation = await client.generate(generateParams());
+			const stream = operation.events();
+			transport.emit(
+				notification(operation.operationId, 1, {
+					type: "error",
+					error: { classification: "api", code: "UPSTREAM", message: "refused" },
+				}),
+			);
+			transport.emit(
+				notification(operation.operationId, 2, {
+					type: "done",
+					status: "failed",
+					stopReason: "error",
+				}),
+			);
+			await expect(stream.next()).resolves.toMatchObject({ value: { type: "error" } });
+			await stream.return(undefined);
+			expect(client.getDiagnostics().activeOperations).toBe(0);
+		}
+		expect(transport.requests.filter((item) => item.method === "provider.cancel")).toHaveLength(0);
+		expect(transport.killed).toHaveLength(0);
+	});
+
+	it("releases the operation slot when done arrives after the consumer stopped on error", async () => {
+		const { client, transport } = await setup({ limits: { maxInFlightOperations: 2 } });
+		clients.push(client);
+		for (let attempt = 0; attempt < 3; attempt += 1) {
+			const operation = await client.generate(generateParams());
+			const stream = operation.events();
+			transport.emit(
+				notification(operation.operationId, 1, {
+					type: "error",
+					error: { classification: "api", code: "UPSTREAM", message: "refused" },
+				}),
+			);
+			await expect(stream.next()).resolves.toMatchObject({ value: { type: "error" } });
+			await stream.return(undefined);
+			// The superseded cancel is in flight when the plugin's own done(failed) lands.
+			transport.emit(
+				notification(operation.operationId, 2, {
+					type: "done",
+					status: "failed",
+					stopReason: "error",
+				}),
+			);
+			await new Promise((resolve) => queueMicrotask(resolve));
+			expect(client.getDiagnostics().activeOperations).toBe(0);
+		}
+		expect(transport.killed).toHaveLength(0);
+	});
+
 	it("kills the transport after cancel grace when the plugin never sends done", async () => {
 		const { client, transport } = await setup({ limits: { cancelGraceMs: 10 } });
 		clients.push(client);

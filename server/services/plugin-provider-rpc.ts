@@ -1013,7 +1013,18 @@ export class PluginProviderRpcClient {
 			}
 		} finally {
 			record.iteratorCompleted = true;
-			if (!completed && this.operations.has(record.operationId)) {
+			if (
+				!completed &&
+				this.operations.has(record.operationId) &&
+				(record.state === "terminal_received" || record.state === "failed")
+			) {
+				// local(provider-budget-release): the plugin already ended this operation (e.g. an
+				// error event followed by done(failed)) and the consumer stopped reading before the
+				// queued terminal frames. Nothing remains to cancel, so release the operation slot
+				// now; beginCancel would answer already_done and leak the slot for the lifetime of
+				// this client, eventually exhausting maxInFlightOperations.
+				this.finishOperation(record);
+			} else if (!completed && this.operations.has(record.operationId)) {
 				void this.beginCancel(
 					record,
 					"superseded",
@@ -1277,6 +1288,12 @@ export class PluginProviderRpcClient {
 			bodyBytes,
 			creditKind: terminal ? "terminal" : "normal",
 		});
+		// local(provider-budget-release): done arrived after the consumer already closed the
+		// iterator (typically during the superseded cancel). No reader will drain the queue and
+		// the cancel timer ignores terminal_received, so release the slot here.
+		if (record.state === "terminal_received" && record.iteratorCompleted) {
+			this.finishOperation(record);
+		}
 	}
 
 	private validateEventSemantics(record: OperationRecord, event: ProviderStreamEvent): boolean {
