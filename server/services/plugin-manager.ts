@@ -247,6 +247,12 @@ export interface PluginActivationOptions {
 	automatic?: boolean;
 	/** Reserved for an explicit administrator health test while the flag is disabled. */
 	allowWhenDisabled?: boolean;
+	/**
+	 * LOCAL PATCH plugin-provider-activation: skip the provider catalog refresh inside
+	 * activation. Set when a provider client is itself waiting for this activation: the
+	 * refresh would acquire that same pending client and wait on itself.
+	 */
+	skipProviderCatalogRefresh?: boolean;
 }
 
 export interface PluginPermissionReplaceInput {
@@ -1941,7 +1947,7 @@ export class PluginManager {
 					// The runtime is already up, so pulling the model catalog costs no extra
 					// activation. Discovery failure must not fail activation: the provider stays
 					// registered with a stale catalog and can be refreshed again later.
-					await this.refreshProviderCatalogs(pluginId);
+					if (!options.skipProviderCatalogRefresh) await this.refreshProviderCatalogs(pluginId);
 					return this.requireStatus(pluginId);
 				} catch (error) {
 					this.hostServices.revokeRuntime(pluginId);
@@ -3431,6 +3437,25 @@ export const pluginManager = new PluginManager({
 	providerCatalogRefresher: pluginPlatformServices.providerCatalogRefresher,
 	lifecycleRevokeCoordinator: pluginPlatformServices.lifecycleRevokeCoordinator,
 	restorePluginLifecycle: pluginPlatformServices.restorePlugin,
+});
+
+// LOCAL PATCH plugin-provider-activation (see ~/.narrafork-deploy/LOCAL_PATCHES.md): provider
+// use starts a stopped plugin through the manager, which builds runtime options from the
+// current package instead of restarting the supervisor's stale record after an upgrade.
+pluginPlatformServices.setProviderActivator(async (pluginId, reason) => {
+	await pluginManager.activate(pluginId, {
+		reason: `provider:${reason}`,
+		automatic: true,
+		// The provider client that asked is waiting on this activation; a catalog refresh
+		// inside it would acquire that same client. Refresh after it settles instead.
+		skipProviderCatalogRefresh: true,
+	});
+	void pluginPlatformServices.providerCatalogRefresher.refreshStale().catch((error: unknown) => {
+		logger.warn("Plugin provider catalog refresh failed after provider activation", {
+			pluginId,
+			error: error instanceof Error ? error.message : String(error),
+		});
+	});
 });
 
 pluginPlatformServices.publicApi.configureAdapters(

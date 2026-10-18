@@ -2159,6 +2159,87 @@ describe("PluginManager", () => {
 		expect(status?.current?.version).toBe("2.0.0");
 	});
 
+	test("provider use after an upgrade starts the new package, not the stale record", async () => {
+		// LOCAL PATCH plugin-provider-activation guard. The provider client pool starts a
+		// stopped plugin on first use. It used to call runtimeSupervisor.start(pluginId),
+		// which restarts the supervisor's existing record: after an upgrade that is the
+		// previous package, so the old binary ran while the manager reported the new one.
+		const root = await makeTempRoot();
+		const storeRoot = join(root, "plugins");
+		const pluginId = "com.example.provider-upgrade-restart";
+		const supervisor = new FakeSupervisor();
+		const stateStore = new PluginStateStore(storeRoot);
+		const permissionStore = new PluginPermissionStore({ root: storeRoot, stateStore });
+		const capabilityBroker = new CapabilityBroker();
+		const hostServices = new PluginHostServices({ capabilityBroker, permissionStore });
+		const platform = createPluginPlatformServices({
+			runtimeSupervisor: supervisor as never,
+			stateStore,
+			permissionStore,
+			capabilityBroker,
+			hostServices,
+		});
+		const manager = new PluginManager({
+			root: storeRoot,
+			disabled: false,
+			stateStore,
+			permissionStore,
+			hostServices,
+			runtimeSupervisor: supervisor,
+			runtimeOptionsFactory: async (context) => ({
+				pluginId: context.pluginId,
+				pluginVersion: context.manifest.version,
+				packageDigest: context.package.hash,
+				command: ["fake-runtime", context.package.hash],
+				cwd: context.packagePath,
+			}),
+			lifecycleRevokeCoordinator: platform.lifecycleRevokeCoordinator,
+			restorePluginLifecycle: platform.restorePlugin,
+		});
+		platform.setProviderActivator(async (id, reason) => {
+			await manager.activate(id, {
+				reason: `provider:${reason}`,
+				automatic: true,
+				skipProviderCatalogRefresh: true,
+			});
+		});
+		// The pool's runtime resolver (what DeferredProviderClient calls on first use).
+		const resolveRuntime = (
+			platform.providerClientPool as unknown as {
+				resolveRuntime: (id: string, options: { reason: string }) => Promise<FakeRuntime>;
+			}
+		).resolveRuntime;
+
+		const v1Source = await makePackage(root, pluginId, (manifest) => {
+			manifest.version = "1.0.0";
+			(manifest.permissions as Record<string, unknown>).host = ["diagnostics.readOwnLogs"];
+		});
+		await manager.install(v1Source);
+		await manager.enable(pluginId);
+		// v1 runs once (as after an explicit enable/activate in production).
+		await manager.activate(pluginId);
+		const v1Runtime = supervisor.get(pluginId);
+		if (!v1Runtime) throw new Error("v1 runtime was not registered");
+		const v1Hash = v1Runtime.options.command[1];
+
+		// Upgrade: install stops the v1 runtime; enable does not start anything.
+		const v2Source = await makePackage(root, pluginId, (manifest) => {
+			manifest.version = "2.0.0";
+			(manifest.permissions as Record<string, unknown>).host = ["diagnostics.readOwnLogs"];
+		});
+		await manager.install(v2Source);
+		await manager.enable(pluginId);
+		expect(supervisor.get(pluginId)?.state).toBe("stopped");
+
+		// The next provider use must start the v2 package.
+		const v2Runtime = await resolveRuntime(pluginId, { reason: "onProvider:test" });
+		expect(v2Runtime.state).toBe("active");
+		expect(v2Runtime.options.command[1]).not.toBe(v1Hash);
+		const status = await manager.getStatus(pluginId);
+		expect(status?.current?.hash).toBe(v2Runtime.options.command[1]);
+		expect(status?.current?.version).toBe("2.0.0");
+	});
+
 	test("approve writes the canonical grant to the DB authority, surviving a manager rebuild", async () => {
 		const root = await makeTempRoot();
 		const pluginId = "com.example.approve-canonical";

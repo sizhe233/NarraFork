@@ -101,7 +101,18 @@ export interface PluginPlatformServices {
 	contributionCoordinator: PluginContributionCoordinator;
 	lifecycleRevokeCoordinator: PluginLifecycleRevokeCoordinator;
 	restorePlugin(pluginId: string): Promise<void>;
+	/**
+	 * LOCAL PATCH plugin-provider-activation (see ~/.narrafork-deploy/LOCAL_PATCHES.md):
+	 * registers the lifecycle owner (PluginManager) that starts a stopped plugin for
+	 * provider use. Its activation rebuilds runtime options from the *current* package, so
+	 * an upgraded plugin's next on-demand start runs the new binary. Without it the provider
+	 * pool restarted the supervisor's stale record, i.e. the previous package.
+	 */
+	setProviderActivator(activator: PluginProviderActivator | undefined): void;
 }
+
+/** Starts a plugin for provider use; resolves once its runtime is active. */
+export type PluginProviderActivator = (pluginId: string, reason: string) => Promise<void>;
 
 export interface PluginPlatformServicesOptions {
 	runtimeSupervisor?: RuntimeSupervisor;
@@ -665,12 +676,23 @@ export function createPluginPlatformServices(
 	const providerRegistry = options.providerRegistry ?? defaultPluginProviderRegistry;
 	// One pool shared by the adapter factory and the catalog refresher, so a provider
 	// is activated and handshaken once regardless of which path reaches it first.
+	// LOCAL PATCH plugin-provider-activation: set by PluginManager (setProviderActivator).
+	let providerActivator: PluginProviderActivator | undefined;
 	const providerClientPool =
 		options.providerClientPool ??
 		new PluginProviderClientPool(async (pluginId, { reason }) => {
 			const existing = runtimeSupervisor.get(pluginId);
 			if (existing && ["active", "degraded"].includes(existing.state)) {
 				return existing as unknown as ProviderRuntimeLike;
+			}
+			if (providerActivator) {
+				// The manager builds runtime options from the current package (and binds
+				// access), so an upgraded plugin starts its new binary here.
+				await providerActivator(pluginId, reason);
+				const activated = runtimeSupervisor.get(pluginId);
+				if (!activated) throw new Error(`Runtime is not registered: ${pluginId}`);
+				logger.debug("plugin runtime activated for provider use", { pluginId, reason });
+				return activated as unknown as ProviderRuntimeLike;
 			}
 			const started = await runtimeSupervisor.start(pluginId);
 			logger.debug("plugin runtime activated for provider use", { pluginId, reason });
@@ -932,6 +954,9 @@ export function createPluginPlatformServices(
 	return {
 		...services,
 		restorePlugin: (pluginId) => restorePluginAccess(services, pluginId),
+		setProviderActivator: (activator) => {
+			providerActivator = activator;
+		},
 	};
 }
 
