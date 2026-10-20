@@ -85,6 +85,26 @@ export function findPluginProviderForModel(
 }
 
 /**
+ * Context window a plugin provider's catalog reports for `provider:bareModel`.
+ *
+ * LOCAL PATCH (plugin-model-context-window): feeds `resolveModelContextWindow`, which
+ * otherwise never sees plugin catalogs and falls back to its 272k default. Matched by the
+ * provider prefix (case-insensitive, as the registry stores it), so two plugins exposing
+ * the same model id do not borrow each other's window. A disabled or unavailable provider
+ * still answers: its catalog describes the model the narrator is configured with.
+ */
+export function findPluginProviderContextWindow(
+	registry: PluginProviderRegistry,
+	provider: string,
+	bareModel: string,
+): number | undefined {
+	const entry = registry.get(provider);
+	if (!entry || !isPluginProvider(entry)) return undefined;
+	const window = entry.getModel(bareModel)?.contextWindow;
+	return window !== undefined && Number.isSafeInteger(window) && window > 0 ? window : undefined;
+}
+
+/**
  * Per-provider groups for the settings API / model picker.
  *
  * Unlike {@link listPluginProviderModelValues} this keeps unavailable providers, so

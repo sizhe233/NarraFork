@@ -77,10 +77,17 @@ let geminiModelLister: (() => string[]) | null = null;
  * providers is not known at build time. Sources must be synchronous and cheap:
  * they are consulted on request paths (`getVisibleModels`, provider resolution).
  */
-const extraModelSources = new Map<
-	string,
-	{ listModels: () => string[]; resolveProvider?: (bareModel: string) => string | undefined }
->();
+interface ExtraModelSource {
+	listModels: () => string[];
+	resolveProvider?: (bareModel: string) => string | undefined;
+	/**
+	 * Context window the source reports for `provider:model`, or undefined when it does
+	 * not know the model. Consulted by `resolveModelContextWindow` as a catalog value.
+	 */
+	contextWindow?: (provider: string, bareModel: string) => number | undefined;
+}
+
+const extraModelSources = new Map<string, ExtraModelSource>();
 
 /**
  * Register (or replace) a named model source.
@@ -89,13 +96,7 @@ const extraModelSources = new Map<
  * Registering the same name twice replaces the previous source rather than stacking,
  * which keeps repeated wiring idempotent.
  */
-export function registerExtraModelSource(
-	name: string,
-	source: {
-		listModels: () => string[];
-		resolveProvider?: (bareModel: string) => string | undefined;
-	},
-): () => void {
+export function registerExtraModelSource(name: string, source: ExtraModelSource): () => void {
 	extraModelSources.set(name, source);
 	return () => {
 		if (extraModelSources.get(name) === source) extraModelSources.delete(name);
@@ -120,6 +121,25 @@ function resolveExtraProvider(bareModel: string): string | undefined {
 		try {
 			const prefix = source.resolveProvider?.(bareModel);
 			if (prefix) return prefix;
+		} catch {
+			// Ignore and try the next source.
+		}
+	}
+	return undefined;
+}
+
+/**
+ * LOCAL PATCH (plugin-model-context-window): the context window an extra model source
+ * reports. Without it a plugin model (e.g. opencode2api:deepseek-v4.1-flash-free, 1M)
+ * matched no card, NUG catalog or provider config and fell back to
+ * DEFAULT_CONTEXT_WINDOW (272k), so compaction and the context meter used the wrong size.
+ */
+function extraModelContextWindow(provider: string, bareModel: string): number | undefined {
+	if (!provider) return undefined;
+	for (const source of extraModelSources.values()) {
+		try {
+			const window = source.contextWindow?.(provider, bareModel);
+			if (window !== undefined && Number.isSafeInteger(window) && window > 0) return window;
 		} catch {
 			// Ignore and try the next source.
 		}
@@ -1095,6 +1115,10 @@ export function resolveModelContextWindow(
 			contextWindow: window,
 			source: layer === "local-binding" ? "user" : layer === "discovered" ? "catalog" : "card",
 		};
+	// LOCAL PATCH (plugin-model-context-window): a plugin provider's own catalog plays the
+	// gateway-discovered role for its models.
+	const extraWindow = extraModelContextWindow(provider, bareModel);
+	if (extraWindow) return { contextWindow: extraWindow, source: "catalog" };
 	// A provider's explicit budget outranks presets, but not local model/binding
 	// decisions or the gateway's discovered window.
 	const configured =

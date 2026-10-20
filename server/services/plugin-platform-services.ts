@@ -34,6 +34,7 @@ import { PluginProviderClientPool, type ProviderRuntimeLike } from "./plugin-pro
 import { PluginProviderConfigService } from "./plugin-provider-config-service";
 import { PluginProviderCredentialResolver } from "./plugin-provider-credential-resolver";
 import {
+	findPluginProviderContextWindow,
 	findPluginProviderForModel,
 	listPluginProviderModelValues,
 } from "./plugin-provider-model-source";
@@ -854,6 +855,8 @@ export function createPluginPlatformServices(
 	registerExtraModelSource("plugin-providers", {
 		listModels: () => listPluginProviderModelValues(providerRegistry),
 		resolveProvider: (bareModel) => findPluginProviderForModel(providerRegistry, bareModel),
+		contextWindow: (provider, bareModel) =>
+			findPluginProviderContextWindow(providerRegistry, provider, bareModel),
 	});
 	// Plugin-contributed web search sources. Credentials and config come from the provider
 	// each source binds to, which is why this reuses the provider registry, credential
