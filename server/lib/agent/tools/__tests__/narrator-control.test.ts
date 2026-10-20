@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { isRuntimeToolAllowed, resolveRuntimePolicy } from "@server/services/agent-runtime/policy";
+import {
+	compileDelegationPolicy,
+	isRuntimeToolAllowed,
+	resolveRuntimePolicy,
+} from "@server/services/agent-runtime/policy";
 import { getBuiltinRoutine, getBuiltinToolNames } from "../../../builtin-routines";
 import { OPTIONAL_TOOLS } from "../index";
 import { narratorControlTool } from "../narrator-control";
@@ -15,14 +19,20 @@ describe("NarratorControl registration (local patch)", () => {
 		expect(OPTIONAL_TOOLS.get("NarratorControl")).toBe(narratorControlTool);
 	});
 
-	test("is hidden from every subagent profile", () => {
-		expect(
-			isRuntimeToolAllowed(resolveRuntimePolicy({ variant: "primary" }), "NarratorControl"),
-		).toBe(true);
-		for (const subagentType of ["general", "explore", "plan", "review", "search"]) {
-			const policy = resolveRuntimePolicy({ variant: "subagent", subagentType });
+	test("is hidden from every delegated (subagent) policy", () => {
+		expect(isRuntimeToolAllowed(resolveRuntimePolicy([]), "NarratorControl")).toBe(true);
+		for (const template of ["general", "explore", "plan", "review", "search"]) {
+			const policy = resolveRuntimePolicy([compileDelegationPolicy({ template })]);
 			expect(isRuntimeToolAllowed(policy, "NarratorControl")).toBe(false);
 		}
+		// Even a custom definition that lists the tool explicitly stays denied.
+		const custom = resolveRuntimePolicy([
+			compileDelegationPolicy({
+				template: "custom-agent",
+				customDefinition: { toolAccess: "custom", customTools: ["NarratorControl"] },
+			}),
+		]);
+		expect(isRuntimeToolAllowed(custom, "NarratorControl")).toBe(false);
 	});
 });
 
